@@ -1,0 +1,6 @@
+PODCAST ADDICT PROFILE
+Adds _0xx at end of file name and extension <- Seems to have changed to this at some point?!
+Replaces . in file name with underscores
+Some Episodes needed to be manually renamed to match majority naming convention
+rgx_fullname = ""
+rgx_filename = ""
