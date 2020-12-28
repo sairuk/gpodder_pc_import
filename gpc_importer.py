@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# gPodder_pc_Import - Import existing Podcast episodes into gPodder
+# gPodder PC Import - Import existing Podcast episodes into gPodder
 # Copyright (c) 2014 Wayne Moulden
 #
 # This is free software; you can redistribute it and/or modify
