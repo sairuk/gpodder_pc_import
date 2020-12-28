@@ -31,9 +31,15 @@ dl_loc = 'Downloads' # gPodder podcast download location (relative to script)
 state = 1 # Episode State (1=Downloaded, 2=Deleted)
 is_new = 1 # Is the episode new? (0=No, 1=Yes)
 sql = True # Set to False to disable SQL commits while testing
+debug = False
 #
 # Podcast file extensions
 match_types = ['.m4a','.m4v','.mp3','.mp4','.ogg','.ogv']
+
+def _log(s):
+    if debug:
+        print(s)
+    return
 
 def main():
     # Open Database
@@ -58,32 +64,60 @@ def main():
         # Build list of available files in dl_loc
         pc_loc = []
         for root, dirs, files in os.walk(dl_loc, 'topdown=FALSE'):
-            for fname in files:
-                filename, ext = os.path.splitext(fname)
-                if ext in match_types:
-                    pc_loc.append(['%s%s' % (fname[:fname.rfind('_')], ext), fname])
-                else:
-                    pass # Do Nothing
+
+            # match the podcast
+            podcast_name = os.path.split(root)[-1]
+
+            # this is a hack replacing assuming an underscore followed by a
+            # space is supposed to be a colon
+            podcast_name = podcast_name.replace('_ ',': ')
+            try:
+                podcast_id = conn.execute("SELECT id from podcast WHERE title = '%s'" % podcast_name).fetchone()[0]
+            except:
+                podcast_id = None
+
+            # we wont waste out time iter the dir if its not a podcast
+            if podcast_id is not None:
+                for fname in files:
+                    filename, ext = os.path.splitext(fname)
+                    if ext in match_types:
+                        #pc_loc.append(['%s%s' % (fname[:fname.rfind('_')], ext), fname])
+                        pc_loc.append([podcast_id, podcast_name, filename, fname])
+                    else:
+                        pass # Do Nothing
 
         # Match file types, update database information
         cntr = 0
-        for row2, fname in pc_loc:
+        for podcast_id, podcast_name, filename, fname in pc_loc:
             for id, x in pc_url:
-                if row2 in x:
+                if filename in x:
                     cntr += 1
+                    print("FOUND: %s for %s" %
+                            (filename, podcast_name))
+                    # see if there is already an entry for this so we don't
+                    # overwrite they users playback position
                     try:
-                        print("FOUND: %s, updating gpodder database" % (row2))
-                        conn.execute("UPDATE episode SET state = %d, is_new = %d, download_filename = '%s' WHERE id = '%d'" % (state, is_new, fname, id))
-                        if sql:
-                            conn.commit()
-                    except sqlite3.OperationalError:
-                        pass # Do Nothing
+                        existing = conn.execute("SELECT is_new FROM episode WHERE download_filename = '%s' AND podcast_id = '%d'" % (fname, podcast_id)).fetchone()[0]
+                        print("EXIST: Existing entry for %s - %s" %
+                                (podcast_name, fname))
+                    except:
+                        existing = False
+                        print("UPDATE: No existing entry found for %s - %s, moving to update" % (podcast_name, fname))
+
+                    # if its new push an update to the db
+                    if not existing:
+                        try:
+                            conn.execute("UPDATE episode SET state = %d, is_new = %d, download_filename = '%s' WHERE id = '%d' AND podcast_id = '%d'" % (state, is_new, fname, id, podcast_id))
+                            if sql:
+                                conn.commit()
+                        except sqlite3.OperationalError as e:
+                            print("Failed error was: %s, updating gpodder database" % e)
                 else:
                     pass # Do Nothing
 
         # Print results to screen
-        print("OLD EPISODES FOUND: %d" % len(pc_loc))
-        print("OLD EPISODES MATCHED: %d" % cntr)
+        print("EPISODES FOUND: %d" % len(pc_loc))
+        print("EPISODES MATCHED TO A PODCAST: %d" % cntr)
 
         # Close Database
         conn.close()
